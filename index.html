@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Il Sentiero delle Nuvole - Lettura Interattiva</title>
+<style>
+  /* Stili globali e layout principale */
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #f0f4f8;
+    color: #333;
+  }
+
+  #container {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0; /* Permette al flex item di restringersi */
+  }
+
+  /* Pannello del testo (sinistro) */
+  #text-panel {
+    width: 50%;
+    padding: 1.5rem 2rem;
+    box-sizing: border-box;
+    background: #fff;
+    border-right: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    opacity: 1;
+    transition: opacity 0.5s ease, background-image 1s ease-in-out; /* Aggiunto transizione per background */
+    overflow-y: auto; /* Abilita lo scroll verticale se il contenuto è troppo lungo */
+    min-width: 320px; /* Larghezza minima per il pannello di testo */
+    background-size: cover;
+    background-position: center;
+    color: #333; /* Default text color */
+    position: relative; /* Necessario per posizionare il pulsante musica */
+  }
+
+  #text-panel.fade-out {
+    opacity: 0;
+  }
+
+  /* Modifica per rendere il testo sempre bianco con ombreggiatura grigia */
+  #chapter-title,
+  #chapter-text {
+    color: #ffffff !important; /* Forza il colore bianco */
+    text-shadow: 2px 2px 4px rgba(50, 50, 50, 0.8); /* Ombreggiatura grigia più pronunciata */
+  }
+
+  #chapter-title {
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  #chapter-text {
+    line-height: 1.6;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    white-space: pre-line; /* Mantiene la formattazione del testo (es. a capo) */
+  }
+
+  #choices {
+    margin-top: auto; /* Spinge i pulsanti di scelta in fondo al pannello */
+  }
+
+  .choice-btn {
+    display: block;
+    margin-bottom: 1.5rem; /* Aumentato il margine inferiore per più spazio */
+    padding: 0.75rem 1rem;
+    background: #2a5d8f;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    text-align: left;
+    transition: background-color 0.3s ease;
+    width: 100%; /* Assicura che i pulsanti occupino tutta la larghezza disponibile */
+  }
+
+  .choice-btn:hover {
+    background-color: #1f4363;
+  }
+
+  .choice-btn[disabled] {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  /* Pannello della mappa (destro) */
+  #map-panel {
+    width: 50%;
+    position: relative;
+    background: #e0ebf6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* Centra il contenitore della mappa */
+    opacity: 1;
+    transition: opacity 0.5s ease;
+    overflow: hidden;
+    min-width: 320px; /* Larghezza minima per il pannello della mappa */
+  }
+
+  #map-panel.fade-out {
+    opacity: 0;
+  }
+
+  #map-container {
+    position: relative;
+    flex: 1;
+    width: 90%;
+    max-width: 600px;
+    /* Rimosso background-image fisso per la mappa, verrà impostato dinamicamente */
+    background-size: cover;
+    background-position: center;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(42, 93, 143, 0.3);
+    overflow: hidden;
+    display: flex; /* Per centrare la mappa al suo interno */
+    align-items: center;
+    justify-content: center;
+    cursor: grab; /* Indica che l'area è interattiva */
+  }
+
+  #map {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    user-select: none;
+    flex-shrink: 0; /* Impedisce alla mappa di restringersi */
+    transform-origin: center center; /* Zoom dal centro */
+    transition: transform 0.1s ease-out; /* Transizione per lo zoom */
+  }
+
+  #map-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1; /* Disegna le linee sotto i nodi */
+    pointer-events: none; /* Importante: il canvas non deve intercettare i click sui nodi */
+  }
+
+  .node {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    background-color: #4a7dbb;
+    border-radius: 50%;
+    cursor: pointer; /* Assicura che il cursore indichi che è cliccabile */
+    box-shadow: 0 0 8px rgba(74, 125, 187, 0.5);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease; /* Aggiunto transform per animazione */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    font-weight: bold;
+    user-select: none;
+    text-align: center;
+    padding: 0.3rem;
+    line-height: 1.2;
+    transform: translate(-50%, -50%); /* Centra il nodo rispetto alle sue coordinate top/left */
+    z-index: 2; /* I nodi sopra le linee */
+  }
+
+  .node:hover {
+    background-color: #6b9ddb;
+    box-shadow: 0 0 15px rgba(107, 157, 219, 0.8);
+    transform: translate(-50%, -50%) scale(1.1); /* Effetto leggero ingrandimento all'hover */
+  }
+
+  .node.current {
+    background-color: #f06e6e;
+    box-shadow: 0 0 20px #f06e6e;
+    animation: pulse 1.5s infinite alternate; /* Animazione per il nodo corrente */
+  }
+
+  @keyframes pulse {
+    from {
+      transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+      transform: translate(-50%, -50%) scale(1.1);
+    }
+  }
+
+  #node-description {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.9);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    width: 90%;
+    font-size: 1rem;
+    color: #333;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    pointer-events: none; /* Permette il click attraverso l'elemento */
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+    text-align: center;
+  }
+
+  #node-description.visible {
+    opacity: 1;
+  }
+
+  #zoom-controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+  }
+
+  #zoom-controls button {
+    padding: 8px 15px;
+    background-color: #2a5d8f;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.3s ease;
+  }
+
+  #zoom-controls button:hover {
+    background-color: #1f4363;
+  }
+
+  /* Sezioni inferiori del pannello di testo */
+  #bottom-panel-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; /* Spazio tra le sezioni */
+    margin-top: 1rem;
+  }
+
+  /* Timeline */
+  #timeline-wrapper { /* Nuovo wrapper per titolo e timeline */
+    background: #dbe9fa;
+    border-radius: 8px;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
+    padding: 0.5rem 1rem;
+  }
+
+  #timeline-wrapper h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    color: #2a5d8f;
+  }
+
+  #timeline {
+    overflow-x: auto; /* Abilita lo scroll orizzontale */
+    white-space: nowrap; /* Impedisce ai nodi di andare a capo */
+    display: flex; /* Per allineare i nodi in linea */
+    align-items: center;
+    padding-bottom: 0.5rem; /* Spazio per la scrollbar */
+  }
+
+  .timeline-node {
+    display: inline-block;
+    padding: 0.3rem 0.6rem;
+    margin-right: 0.5rem;
+    background: #4a7dbb;
+    color: white;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    user-select: none;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    flex-shrink: 0; /* Impedisce ai nodi di restringersi */
+  }
+
+  .timeline-node:hover {
+    background-color: #1f4363;
+    transform: translateY(-2px); /* Effetto leggero sollevamento all'hover */
+  }
+
+  .timeline-node.current {
+    background-color: #f06e6e;
+    font-weight: 700;
+  }
+
+  /* Diario */
+  #diary {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 1rem;
+  }
+
+  #diary label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #2a5d8f;
+  }
+
+  #diary textarea {
+    width: 100%;
+    height: 90px;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 0.5rem;
+    border: 1px solid #999;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+
+  #diary button {
+    margin-top: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #2a5d8f;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+  }
+
+  #diary button:hover {
+    background-color: #1f4363;
+  }
+
+  /* Custom Alert Box */
+  #custom-alert {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #4CAF50; /* Green */
+      color: white;
+      padding: 15px 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+      font-size: 1.1rem;
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out;
+      pointer-events: none; /* Permette il click attraverso l'alert */
+  }
+
+  /* Music controls */
+  #music-controls {
+    position: absolute; /* Posiziona rispetto al pannello di testo */
+    top: 1rem;
+    right: 1rem;
+    z-index: 100;
+    background-color: rgba(42, 93, 143, 0.8);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  }
+
+  #music-toggle-btn {
+    background: none;
+    border: 1px solid #fff;
+    color: #fff;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  #music-toggle-btn:hover {
+    background-color: #fff;
+    color: #2a5d8f;
+  }
+
+  /* SoundCloud iframe nascosto */
+  #soundcloud-player {
+    display: none; /* Nasconde l'iframe */
+  }
+
+  /* Mobile optimization */
+  @media (max-width: 768px) {
+    #container {
+      flex-direction: column;
+    }
+    #text-panel, #map-panel {
+      width: 100%;
+      height: 50vh;
+      min-width: auto;
+    }
+    #map-container {
+      max-width: 100%;
+      height: 100%;
+    }
+    #timeline {
+      max-height: 80px; /* Reintroduco max-height per mobile se necessario */
+      font-size: 0.9rem;
+    }
+    #music-controls {
+      top: 0.5rem;
+      right: 0.5rem;
+      padding: 0.4rem 0.8rem;
+    }
+  }
+
+  /* Preferenze di movimento ridotto per accessibilità */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="container">
+  <div id="text-panel">
+    <h1 id="chapter-title"></h1>
+    <p id="chapter-text"></p>
+
+    <div id="choices">
+      <!-- I pulsanti di scelta verranno inseriti dinamicamente qui -->
+    </div>
+
+    <div id="bottom-panel-sections">
+      <div id="timeline-wrapper">
+        <h3>Cronologia Scelte</h3>
+        <div id="timeline">
+          <!-- I nodi della timeline verranno inseriti dinamicamente qui -->
+        </div>
+      </div>
+
+      <div id="diary">
+        <label for="diary-note"><strong>Diario personale:</strong></label>
+        <textarea id="diary-note" placeholder="Scrivi qui le tue riflessioni, appunti o ricordi..."></textarea>
+        <button id="save-diary">Salva Nota</button>
+      </div>
+    </div>
+
+    <!-- Controlli musicali spostati all'interno del text-panel -->
+    <div id="music-controls">
+      <button id="music-toggle-btn">Avvia Musica</button>
+      <!-- SoundCloud player iframe, initially visible but then hidden by CSS -->
+      <iframe id="soundcloud-player" width="100%" height="100px" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/101306056&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=false"></iframe>
+    </div>
+  </div>
+
+  <div id="map-panel">
+    <div id="map-container">
+      <canvas id="map-canvas"></canvas> <!-- Canvas per disegnare le linee -->
+      <div id="map">
+        <!-- I nodi della mappa verranno inseriti dinamicamente qui -->
+      </div>
+      <div id="node-description"></div>
+    </div>
+    <div id="zoom-controls">
+      <button id="reset-zoom-btn">Reset Zoom</button>
+    </div>
+  </div>
+</div>
+
+<div id="custom-alert"></div> <!-- Elemento per l'alert personalizzato -->
+
+
+<script>
+  // Definizione dei capitoli della storia e dei nodi della mappa.
+  // Ogni capitolo è un oggetto con le seguenti proprietà:
+  // - title (string): Il titolo del capitolo, visualizzato nel pannello di testo e sulla mappa.
+  // - text (string): Il corpo del testo del capitolo.
+  // - choices (array of objects): Un elenco di scelte disponibili per l'utente.
+  //   Ogni scelta ha:
+  //   - label (string): Il testo del pulsante di scelta.
+  //   - node (number): L'ID del nodo del capitolo a cui porta questa scelta.
+  //   - requires (string, optional): L'oggetto richiesto nell'inventario per abilitare questa scelta.
+  //   - addsItem (string, optional): L'oggetto aggiunto all'inventario dopo aver selezionare questa scelta.
+  //   - effects (array of objects, optional): Effetti da applicare quando questa scelta viene selezionata.
+  //     Ogni effetto ha:
+  //     - type (string): Tipo di effetto (es. "addItem", "setFlag", "triggerEvent").
+  //     - item (string, optional): Nome dell'oggetto da aggiungere/rimuovere per "addItem"/"removeItem".
+  //     - flag (string, optional): Nome del flag da impostare per "setFlag".
+  //     - value (boolean, optional): Valore del flag per "setFlag".
+  //     - eventName (string, optional): Nome dell'evento da scatenare per "triggerEvent".
+  // - description (string): Una breve descrizione del nodo, visualizzata quando si passa il mouse sul nodo della mappa.
+  // - pos (object): La posizione del nodo sulla mappa.
+  //   - top (number): La posizione verticale in percentuale (0-100%).
+  //   - left (number): La posizione orizzontale in percentuale (0-100%).
+  // - backgroundImg (string, optional): URL dell'immagine di sfondo per questo capitolo, riflette l'Eco del Reame del luogo.
+  // - darkText (boolean, optional): Se true, il testo del capitolo sarà chiaro per sfondi scuri, riflettendo l'atmosfera dell'Eco del Reame.
+  // - states (object, optional): Stati specifici del capitolo (es. visited).
+  const chapters = {
+    0: {
+      title: "Il Sentiero delle Nuvole",
+      text: "L'aria, quel mattino, era un respiro freddo sulla pelle di Lilia, intrisa dell'umido odore di terra e erba. Il sentiero si snodava tra alberi secolari, le cui foglie danzavano leggere al vento, sussurrando storie antiche. Lilia sentiva un richiamo, una curiosità che la spingeva ad andare avanti, verso l'ignoto. Questo è il punto di partenza, un luogo dove l'Eco del Reame è neutra, dove le tracce del passato sono leggere e le possibilità del futuro sono infinite. L'Eco qui è un sussurro, una promessa appena percettibile di ciò che verrà.",
+      choices: [
+        { label: "Esplora il Parco", node: 1, effects: [{ type: "setFlag", flag: "visitedPark", value: true }] },
+        { label: "Vai verso la Torre", node: 2 }
+      ],
+      description: "Punto di partenza nel cuore del sentiero, dove inizia l'avventura di Lilia. L'Eco del Reame è qui neutra, piena di potenziale inespresso.",
+      pos: { top: 50, left: 50 }, // Centrale
+      backgroundImg: "https://i.ibb.co/hRcSB2wn/il-sentiero-delle-nuvole.png", // Sentiero nebbioso, etereo
+      darkText: true, // Testo chiaro per sfondo scuro/nebbioso
+      states: { visited: false }
+    },
+    1: {
+      title: "Il Parco delle Promesse Sospese",
+      text: "Le nuvole si stendevano nel cielo come lenzuola dimenticate, un bianco lattiginoso che nascondeva un'infinità non detta. Il parco era un'oasi di pace, con fiori dai colori vivaci e il dolce mormorio di un ruscello. Lilia si sentiva avvolta da una sensazione di attesa, come se qualcosa di importante stesse per accadere. Un luogo con un'alta Eco positiva, dove le speranze e i sogni di chi lo ha visitato si sono accumulati, vibrando nell'aria come promesse sospese. Ogni petalo, ogni goccia d'acqua, risuonava con la gioia e la realizzazione passate.",
+      choices: [
+        { label: "Avvicinati al Lago", node: 3 },
+        { label: "Ritorna al Sentiero delle Nuvole", node: 0 }
+      ],
+      description: "Un luogo tranquillo e suggestivo, dove le promesse sembrano fluttuare nell'aria. L'Eco positiva è palpabile qui.",
+      pos: { top: 20, left: 20 }, // Top-left
+      backgroundImg: "https://i.ibb.co/rGY9JfqY/Il-Parco-delle-Promesse-Sospese.png", // Parco fiorito, luce soffusa
+      darkText: false, // Testo scuro per sfondo chiaro
+      states: { visited: false }
+    },
+    2: {
+      title: "La Torre dei Ricordi",
+      text: "Un uomo, avvolto in un impermeabile consunto, si materializzò accanto a Lilia, la sua figura quasi fusa con l'ombra della torre. La Torre custodisce segreti antichi, storie di tempi andati e di destini intrecciati. Lilia sentiva il peso della storia in quel luogo imponente, un'eco di voci lontane che si manifestava attraverso l'Eco densa e quasi tangibile. Ogni pietra sembrava sussurrare un racconto dimenticato.",
+      choices: [
+        { label: "Scala la Torre", node: 4 },
+        { label: "Torna al Sentiero delle Nuvole", node: 0 }
+      ],
+      description: "Un'antica torre, custode di misteri e memorie nascoste. L'Eco è concentrata nelle sue storie.",
+      pos: { top: 80, left: 80 }, // Bottom-right
+      backgroundImg: "https://i.ibb.co/7d2BPXp6/La-Torre-dei-Ricordi.png", // Nuova immagine per la torre
+      darkText: true, // Testo chiaro per sfondo scuro
+      states: { visited: false }
+    },
+    3: {
+      title: "Il Lago Bifronte",
+      text: "Le acque del lago riflettevano due cieli, uno limpido e sereno, l'altro tempestoso e carico di nubi. Lilia sentiva il peso delle sue scelte, come le increspature sulla superficie dell'acqua. Era un luogo di riflessione, dove le decisioni sembravano avere un'eco profonda, amplificata dall'Eco conflittuale che permeava ogni goccia. Le sue acque erano uno specchio delle sue incertezze e delle vie divergenti che poteva intraprendere.",
+      choices: [
+        { label: "Torna al Parco", node: 1 },
+        { label: "Esplora la Foresta Silente", node: 5 },
+        { label: "Cerca qualcosa nel lago", node: 6, addsItem: "Chiave Antica", effects: [{ type: "addItem", item: "Chiave Antica" }] } // Aggiunge un oggetto
+      ],
+      description: "Un lago enigmatico che simboleggia i conflitti interiori e le scelte difficili. L'Eco qui è duale e riflessiva.",
+      pos: { top: 35, left: 70 }, // Mid-right, slightly down
+      backgroundImg: "https://i.ibb.co/zTrjNC3W/Il-Lago-Bifronte.png", // Lago con riflessi contrastanti
+      darkText: true, // Testo chiaro per sfondo scuro
+      states: { visited: false }
+    },
+    4: {
+      title: "La Vetta della Torre",
+      text: "Dall’alto, Lilia vedeva l’intero sentiero delle nuvole, una mappa di luce e ombra che si estendeva all'infinito. Il vento fischiava dolcemente, portando con sé la sensazione di libertà e la consapevolezza di un viaggio ancora lungo. Era un punto di vista privilegiato sul suo cammino, dove l'Eco si manifestava come chiarezza e visione, permettendole di percepire le interconnessioni delle sue scelte e la vasta rete eterea che componeva il Reame. Ogni soffio di vento sembrava sussurrare saggezza antica.",
+      choices: [
+        { label: "Scendi dalla Torre", node: 2 },
+        { label: "Osserva il panorama con il Binocolo", node: 7, requires: "Binocolo", effects: [{ type: "setFlag", flag: "observedPanorama", value: true }] } // Richiede un oggetto
+      ],
+      description: "La cima della torre, offre una visione panoramica e la consapevolezza del proprio percorso. L'Eco qui è chiarezza e intuizione.",
+      pos: { top: 90, left: 60 }, // Bottom-center-right
+      backgroundImg: "https://i.ibb.co/chzMw4bD/La-Vetta-della-Torre-2.png", // Nuova immagine per la vetta della torre (cielo più aperto)
+      darkText: false, // Testo scuro per sfondo più luminoso
+      states: { visited: false }
+    },
+    5: {
+      title: "La Foresta Silente",
+      text: "Tra gli alberi antichi, il silenzio raccontava storie di tempi perduti, di creature nascoste e di segreti sussurrati dal vento. Ogni passo di Lilia era attutito dal muschio, e l'aria era intrisa di un profumo di terra e mistero. Era un luogo dove la natura regnava sovrana, invitando alla meditazione. Un luogo di Eco profonda e antica, dove il 'silenzio' non era assenza, ma la voce delle storie perdute, un coro etereo di eventi passati che risuonava nel profondo dell'anima.",
+      choices: [
+        { label: "Ritorna al Lago Bifronte", node: 3 },
+        { label: "Trova il Binocolo", node: 8, addsItem: "Binocolo", effects: [{ type: "addItem", item: "Binocolo" }] } // Aggiunge un oggetto
+      ],
+      description: "Una foresta densa e misteriosa, un luogo di meditazione e ascolto dei sussurri del passato. L'Eco è antica e profonda qui.",
+      pos: { top: 10, left: 65 }, // Top-right, slightly left
+      backgroundImg: "https://i.ibb.co/p9b2RtC/La-Foresta-Silente.png", // Nuova immagine per la foresta
+      darkText: true, // Testo chiaro per sfondo scuro
+      states: { visited: false }
+    },
+    6: {
+      title: "Il Fondo del Lago",
+      text: "Lilia si immerse nelle acque fredde, la visibilità era scarsa ma la sua mano trovò qualcosa di metallico e freddo sul fondo. Era una Chiave Antica, incrostata di alghe, che sembrava promettere l'apertura di qualcosa di importante. L'Eco qui era densa e quasi cristallizzata, manifestandosi in questo artefatto fisico, carico del significato e del potere derivante dalle intenzioni di chi l'aveva persa o nascosta. Un fremito di conoscenza le percorse le dita mentre stringeva l'oggetto.",
+      choices: [
+        { label: "Risali al Lago Bifronte", node: 3 }
+      ],
+      description: "Il fondo del lago, dove si nascondono oggetti preziosi. L'Eco è qui densa e cristallizzata in artefatti.",
+      pos: { top: 50, left: 90 }, // Mid-right, far
+      backgroundImg: "https://i.ibb.co/5W9SG0xk/Il-Fondo-del-Lago2.png", // Nuova immagine per il fondo del lago
+      darkText: true, // Testo chiaro per sfondo scuro
+      states: { visited: false }
+    },
+    7: {
+      title: "Orizzonti Lontani",
+      text: "Con il binocolo, Lilia poté scrutare l'orizzonte, vedendo dettagli che prima le erano sfuggiti: una piccola capanna nascosta tra le montagne e un sentiero appena visibile che conduceva verso di essa. Il mondo sembrava espandersi davanti ai suoi occhi, e l'Eco si manifestava come possibilità inesplorate, un invito a proseguire il viaggio. Ogni dettaglio rivelato dal binocolo era una nuova traccia eterea, un percorso potenziale che si apriva davanti a lei.",
+      choices: [
+        { label: "Scendi dalla Torre", node: 2 },
+        { label: "Vai verso la Capanna del Saggio", node: 9, requires: "Chiave Antica" } // Richiede un oggetto
+      ],
+      description: "Una vista mozzafiato che rivela nuovi percorsi. L'Eco si espande come nuove possibilità.",
+      pos: { top: 90, left: 20 }, // Bottom-left
+      backgroundImg: "https://i.ibb.co/spZ01bKz/Orizzonti-Lontani2.png", // Nuova immagine per orizzonti lontani
+      darkText: false, // Testo scuro per sfondo potenzialmente luminoso
+      states: { visited: false }
+    },
+    8: {
+      title: "Il Nido Nascosto",
+      text: "Tra i rami più alti di un albero secolare, Lilia trovò un nido abbandonato. Al suo interno, non c'erano uova, ma un binocolo lucido, quasi nuovo. Sembrava aspettare di essere trovato, promettendo nuove prospettive e un piccolo punto di Eco positiva e scoperta. L'oggetto era intriso di una leggera aura di curiosità e illuminazione, un dono lasciato forse da un altro viaggiatore guidato dall'Eco del Reame.",
+      choices: [
+        { label: "Ritorna alla Foresta Silente", node: 5 }
+      ],
+      description: "Un nascondiglio inaspettato con un oggetto utile. Un piccolo punto di Eco positiva e scoperta.",
+      pos: { top: 10, left: 90 }, // Top-right, far
+      backgroundImg: "https://i.ibb.co/1f0SyRFS/Il-Nido-Nascosto4.png", // Immagine aggiornata per Il Nido Nascosto
+      darkText: false, // Testo scuro per sfondo chiaro
+      states: { visited: false }
+    },
+    9: {
+      title: "La Capanna del Saggio",
+      text: "La Chiave Antica scattò nella serratura della capanna. All'interno, un vecchio saggio attendeva, circondato da libri e pergamene. Ti sorride e ti invita a sedere, pronto a condividere la sua saggezza. Questo è un finale del tuo viaggio, un luogo dove l'Eco è concentrata e armonizzata, dove tutte le tracce eteree del tuo percorso si uniscono per formare una comprensione più profonda. Il saggio, un maestro dell'Eco del Reame, irradiava una calma che permeava l'intera capanna.",
+      choices: [
+        { label: "Inizia un nuovo viaggio", node: 0 } // Finale, si può ricominciare
+      ],
+      description: "Il luogo del sapere e della conclusione del viaggio. L'Eco qui è concentrata e armonizzata.",
+      pos: { top: 10, left: 10 }, // Top-left, far
+      backgroundImg: "https://i.ibb.co/DHNkmyvg/La-Capanna-del-Saggio.png", // Immagine aggiornata per la Capanna del Saggio
+      darkText: true, // Testo chiaro per sfondo scuro
+      states: { visited: false }
+    }
+  };
+
+  // Riferimenti agli elementi DOM
+  const textPanel = document.getElementById('text-panel');
+  const mapPanel = document.getElementById('map-panel');
+  const textTitle = document.getElementById('chapter-title');
+  const textBody = document.getElementById('chapter-text');
+  const choicesDiv = document.getElementById('choices');
+  const mapElement = document.getElementById('map');
+  const mapCanvas = document.getElementById('map-canvas'); // Riferimento al canvas
+  const ctx = mapCanvas.getContext('2d'); // Contesto 2D del canvas
+  const nodeDescription = document.getElementById('node-description');
+  const timeline = document.getElementById('timeline');
+  const diaryNote = document.getElementById('diary-note');
+  const saveDiaryBtn = document.getElementById('save-diary');
+  const customAlert = document.getElementById('custom-alert');
+  const musicToggleButton = document.getElementById('music-toggle-btn');
+  const resetZoomBtn = document.getElementById('reset-zoom-btn'); // Nuovo pulsante
+
+  // Configurazione della modalità debug
+  const DEBUG_MODE = true; // Imposta a 'true' per abilitare gli strumenti di debug
+
+  // Variabili globali per le istanze delle classi, inizializzate in DOMContentLoaded
+  let gameState;
+  let eventSystem;
+  let mapManager;
+  let effectSystem;
+  let plugins;
+
+
+  // --- Funzioni di Utilità (Spostate in alto per accessibilità globale) ---
+
+  /**
+   * Mostra un messaggio di allerta personalizzato.
+   * @param {string} message - Il messaggio da visualizzare.
+   * @param {string} type - Il tipo di messaggio ('success', 'error', 'info').
+   */
+  function showCustomAlert(message, type = 'info') {
+      customAlert.textContent = message;
+      customAlert.style.backgroundColor = ''; // Reset background
+      switch (type) {
+          case 'success':
+              customAlert.style.backgroundColor = '#4CAF50'; // Verde
+              break;
+          case 'error':
+              customAlert.style.backgroundColor = '#f44336'; // Rosso
+              break;
+          case 'info':
+          default:
+              customAlert.style.backgroundColor = '#2196F3'; // Blu
+              break;
+      }
+
+      // Fade in
+      customAlert.style.opacity = '1';
+
+      // Fade out e rimozione dopo un certo tempo
+      setTimeout(() => {
+          customAlert.style.opacity = '0';
+      }, 3000);
+  }
+
+  /**
+   * Esegue la transizione di fade-out dei pannelli.
+   * @returns {Promise<void>} Una Promise che si risolve al termine della transizione.
+   */
+  function transitionOut() {
+    return new Promise(resolve => {
+      textPanel.classList.add('fade-out');
+      mapPanel.classList.add('fade-out');
+      // Attendi che la transizione CSS sia completata
+      setTimeout(resolve, 400); // Corrisponde alla durata della transizione CSS
+    });
+  }
+
+  /**
+   * Esegue la transizione di fade-in dei pannelli.
+   * @returns {Promise<void>} Una Promise che si risolve al termine della transizione.
+   */
+  function transitionIn() {
+    return new Promise(resolve => {
+      textPanel.classList.remove('fade-out');
+      mapPanel.classList.remove('fade-out');
+      // Attendi che la transizione CSS sia completata
+      setTimeout(resolve, 400); // Corrisponde alla durata della transizione CSS
+    });
+  }
+
+  /**
+   * Precarica gli asset (es. immagini di sfondo) per un capitolo.
+   * @param {object} chapter - L'oggetto capitolo.
+   * @returns {Promise<void>} Una Promise che si risolve quando tutti gli asset sono caricati.
+   */
+  async function preloadAssets(chapter) {
+    const promises = [];
+
+    if (chapter.backgroundImg) {
+      promises.push(new Promise((resolve) => {
+        const img = new Image();
+        img.src = chapter.backgroundImg;
+        img.onload = resolve;
+        img.onerror = () => {
+          console.warn("Impossibile caricare l'immagine di sfondo:", chapter.backgroundImg);
+          resolve(); // Risolvi comunque per non bloccare il caricamento del capitolo
+        };
+      }));
+    }
+
+    await Promise.all(promises);
+  }
+
+  /**
+   * Aggiorna l'interfaccia utente con i dati del capitolo corrente.
+   * @param {object} chapter - L'oggetto capitolo da visualizzare.
+   */
+  function updateUI(chapter) {
+    // Aggiorna il contenuto del pannello di testo
+    textTitle.textContent = chapter.title;
+    textBody.textContent = chapter.text;
+
+    // Imposta l'immagine di sfondo
+    textPanel.style.backgroundImage = chapter.backgroundImg ? `url(${chapter.backgroundImg})` : 'none';
+    // Rimuovi la classe darkText perché il colore del testo è ora forzato a bianco con ombreggiatura
+    textPanel.classList.remove('dark-text');
+
+
+    // Aggiorna i pulsanti di scelta (con controllo inventario e flag)
+    updateChoices();
+
+    // Ricrea e aggiorna i nodi della mappa
+    createMapNodes();
+
+    // Disegna le linee della mappa
+    drawMapPaths();
+
+    // Aggiorna la descrizione del nodo sulla mappa
+    nodeDescription.textContent = chapter.description;
+    nodeDescription.classList.add('visible');
+
+    // Aggiorna la timeline
+    updateTimeline();
+
+    // Carica la nota del diario per il nodo corrente
+    diaryNote.value = gameState.diary[gameState.currentNode] || "";
+  }
+
+  /**
+   * Carica un capitolo specifico con animazione di transizione.
+   * @param {number} nodeId - L'ID del capitolo da caricare.
+   * @param {boolean} addToHistory - Indica se il capitolo deve essere aggiunto alla cronologia.
+   */
+  async function loadChapter(nodeId, addToHistory = true) {
+    const chapter = chapters[nodeId];
+    if (!chapter) {
+      console.error(`Capitolo con ID ${nodeId} non trovato.`);
+      return fallbackToSafeChapter();
+    }
+
+    // Transizione in uscita
+    await transitionOut();
+
+    try {
+      // Aggiornamento stato
+      gameState.currentNode = nodeId;
+      if (addToHistory && gameState.history[gameState.history.length - 1] !== nodeId) {
+        gameState.history.push(nodeId);
+      }
+
+      // Caricamento assets
+      await preloadAssets(chapter);
+
+      // Aggiornamento UI
+      updateUI(chapter);
+
+      // Transizione in entrata
+      await transitionIn();
+      
+      // Salvataggio
+      gameState.save();
+
+      // Triggera evento per plugin
+      plugins.trigger('onChapterLoad', { id: chapter.node, title: chapter.title });
+
+    } catch (error) {
+      console.error("Errore durante il caricamento del capitolo:", error);
+      showCustomAlert("Errore nel caricamento del capitolo.", 'error');
+      recoverFromError();
+    }
+  }
+
+  /**
+   * Fallback a un capitolo sicuro in caso di errore.
+   */
+  function fallbackToSafeChapter() {
+    console.error("Tentativo di fallback al capitolo iniziale (0).");
+    // Per evitare loop infiniti in caso di errore nel capitolo 0, controlliamo se siamo già lì
+    if (gameState.currentNode !== 0) {
+      loadChapter(0, false); // Carica il capitolo 0 senza aggiungerlo alla cronologia
+    } else {
+      showCustomAlert('Impossibile caricare il capitolo iniziale. Ricarica la pagina.', 'error');
+    }
+  }
+
+  /**
+   * Funzione per recuperare da un errore grave (per ora, un semplice alert).
+   */
+  function recoverFromError() {
+    showCustomAlert('Si è verificato un errore critico. Il gioco potrebbe non funzionare correttamente.', 'error');
+    // Qui si potrebbe aggiungere logica più complessa, come un reset completo o un report dell'errore.
+  }
+
+  /**
+   * Naviga nella cronologia dei capitoli.
+   * @param {number} direction - -1 per indietro, 1 per avanti.
+   */
+  function navigateHistory(direction) {
+    const currentIndex = gameState.history.indexOf(gameState.currentNode);
+    let newIndex = currentIndex + direction;
+
+    if (newIndex >= 0 && newIndex < gameState.history.length) {
+      loadChapter(gameState.history[newIndex], false); // Non aggiungere alla cronologia
+    } else {
+      showCustomAlert('Fine della cronologia!', 'info');
+    }
+  }
+
+  /**
+   * Imposta le funzionalità di accessibilità.
+   */
+  function setupAccessibility() {
+    // Navigazione da tastiera per la cronologia
+    eventSystem.on('keydown', 'body', (e) => {
+      if (e.key === 'ArrowLeft') {
+        navigateHistory(-1);
+      } else if (e.key === 'ArrowRight') {
+        navigateHistory(1);
+      }
+    });
+
+    // Gestione del focus per il contenuto principale
+    textPanel.setAttribute('tabindex', '-1'); // Rende il pannello focusabile
+    textPanel.focus(); // Inizialmente focalizza il pannello di testo
+  }
+
+  /**
+   * Ottimizza le prestazioni dell'applicazione.
+   */
+  function optimizePerformance() {
+    // Intersection Observer per i nodi della mappa:
+    // Nasconde i nodi che non sono visibili per ridurre il carico di rendering.
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        // Imposta la visibilità in base all'intersezione
+        entry.target.style.visibility = entry.isIntersecting ? 'visible' : 'hidden';
+      });
+    }, { threshold: 0.1 }); // Triggera quando almeno il 10% dell'elemento è visibile
+
+    // Seleziona solo i nodi all'interno della mappa per l'osservatore
+    mapElement.querySelectorAll('.node').forEach(node => {
+      observer.observe(node);
+    });
+  }
+
+  // --- Funzioni Esistenti Adattate ---
+
+  /**
+   * Gestisce il click su un pulsante di scelta.
+   * @param {Event} e - L'evento click.
+   */
+  function handleChoiceClick(e) {
+    if (e.target.classList.contains('choice-btn') && !e.target.disabled) {
+      const nextNode = +e.target.dataset.node;
+      const choice = chapters[gameState.currentNode].choices.find(c => c.node === nextNode);
+
+      // Applica gli effetti definiti nella scelta
+      if (choice && choice.effects) {
+        effectSystem.applyEffects(choice.effects);
+      }
+
+      loadChapter(nextNode, true); // Aggiungi alla cronologia
+    }
+  }
+
+  /**
+   * Gestisce il salvataggio della nota del diario.
+   */
+  function handleSaveDiary() {
+    try {
+      gameState.diary[gameState.currentNode] = diaryNote.value.trim();
+      gameState.save(); // Salva l'intero stato del gioco
+      showCustomAlert('Nota salvata nel diario!', 'success');
+    } catch (e) {
+      console.error("Errore durante il salvataggio del diario:", e);
+      showCustomAlert('Errore nel salvataggio della nota. Spazio di archiviazione insufficiente?', 'error');
+    }
+  }
+
+  /**
+   * Crea e aggiorna i nodi della mappa in base ai capitoli definiti.
+   */
+  function createMapNodes() {
+    mapElement.innerHTML = ''; // Pulisce la mappa esistente
+    Object.entries(chapters).forEach(([key, chapter]) => {
+      const node = document.createElement('div');
+      node.className = 'node';
+      if (+key === gameState.currentNode) node.classList.add('current'); // Marca il nodo corrente
+      node.dataset.node = key;
+      node.style.top = chapter.pos.top + '%';
+      node.style.left = chapter.pos.left + '%';
+      node.title = chapter.title;
+      node.textContent = chapter.title.length > 12 ? chapter.title.slice(0, 9) + "..." : chapter.title;
+      mapElement.appendChild(node);
+
+      // Event listener per la descrizione del nodo al passaggio del mouse
+      node.addEventListener('mouseenter', () => {
+        nodeDescription.textContent = chapter.description;
+        nodeDescription.classList.add('visible');
+      });
+      node.addEventListener('mouseleave', () => {
+        nodeDescription.classList.remove('visible');
+        // Ri-visualizza la descrizione del nodo corrente quando il mouse lascia un altro nodo
+        nodeDescription.textContent = chapters[gameState.currentNode].description;
+        nodeDescription.classList.add('visible');
+      });
+      // Aggiungi il listener di click direttamente al nodo
+      node.addEventListener('click', () => {
+        const nodeId = +node.dataset.node;
+        if (nodeId !== gameState.currentNode) {
+          loadChapter(nodeId, true);
+        }
+      });
+    });
+  }
+
+  /**
+   * Aggiorna i pulsanti di scelta nel pannello del testo.
+   * Abilita/disabilita le scelte in base agli oggetti nell'inventario e ai flag.
+   */
+  function updateChoices() {
+    choicesDiv.innerHTML = ''; // Pulisce le scelte esistenti
+    chapters[gameState.currentNode].choices.forEach(choice => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.textContent = choice.label;
+      btn.dataset.node = choice.node;
+
+      let isDisabled = false;
+      let disableReasons = [];
+
+      // Controlla se la scelta richiede un oggetto specifico
+      if (choice.requires && !gameState.inventory.includes(choice.requires)) {
+        isDisabled = true;
+        disableReasons.push(`Richiede: ${choice.requires}`);
+      }
+      // Controlla se la scelta richiede un flag specifico
+      if (choice.requiresFlag && !gameState.flags[choice.requiresFlag]) {
+        isDisabled = true;
+        disableReasons.push(`Richiede: ${choice.requiresFlag}`);
+      }
+
+      if (isDisabled) {
+        btn.disabled = true;
+        btn.title = disableReasons.join(', '); // Unisce tutte le ragioni di disabilitazione
+      }
+      choicesDiv.appendChild(btn);
+    });
+  }
+
+  /**
+   * Aggiorna la timeline dei nodi visitati.
+   */
+  function updateTimeline() {
+    timeline.innerHTML = ''; // Pulisce la timeline esistente
+    gameState.history.forEach(nodeId => {
+      const nodeBtn = document.createElement('span');
+      nodeBtn.className = 'timeline-node';
+      if (nodeId === gameState.currentNode) nodeBtn.classList.add('current');
+      nodeBtn.textContent = chapters[nodeId].title.length > 15 ? chapters[nodeId].title.slice(0, 12) + "..." : chapters[nodeId].title;
+      nodeBtn.title = chapters[nodeId].title;
+      nodeBtn.dataset.node = nodeId;
+      nodeBtn.addEventListener('click', () => {
+        if (nodeId !== gameState.currentNode) loadChapter(nodeId, false); // Non aggiungere alla cronologia se si torna indietro
+      });
+      timeline.appendChild(nodeBtn);
+    });
+  }
+
+  /**
+   * Disegna le linee di connessione tra i nodi sulla mappa.
+   * Le linee visitate sono evidenziate, quelle non visitate sono oscurate.
+   */
+  function drawMapPaths() {
+    // Assicurati che le dipendenze siano pronte
+    if (!mapManager || !mapCanvas || !ctx || !mapContainer) {
+        console.warn("drawMapPaths: Dipendenze non pronte. Saltando il disegno delle linee.");
+        return;
+    }
+
+    // Ensure canvas dimensions match mapContainer's current (unscaled) dimensions
+    mapCanvas.width = mapContainer.clientWidth;
+    mapCanvas.height = mapContainer.clientHeight;
+
+    ctx.clearRect(0, 0, mapCanvas.width, mapCanvas.height); // Pulisci il canvas
+
+    // Mappa per tenere traccia delle connessioni già disegnate per evitare duplicati (es. A->B e B->A)
+    const drawnConnections = new Set();
+
+    /**
+     * Funzione helper per ottenere le coordinate centrali di un nodo in pixel,
+     * già scalate in base allo zoom della mappa, relative al mapContainer.
+     * @param {number} nodeId - L'ID del nodo.
+     * @returns {object|null} Un oggetto {x, y} o null se il nodo non è trovato.
+     */
+    const getNodeCenter = (nodeId) => {
+      const chapter = chapters[nodeId];
+      if (!chapter || !chapter.pos) {
+        console.warn(`Capitolo o posizione non trovata per ID: ${nodeId}`);
+        return null;
+      }
+
+      // Get the unscaled dimensions of the mapContainer (which is the parent of map and canvas)
+      const mapContainerWidth = mapContainer.clientWidth;
+      const mapContainerHeight = mapContainer.clientHeight;
+
+      // Calculate the position in pixels based on percentages, relative to the UNscaled map.
+      // Then apply the current map scale.
+      // The node's CSS `top` and `left` are already its center due to `transform: translate(-50%, -50%)`.
+      const x = (chapter.pos.left / 100) * mapContainerWidth * mapManager.scale;
+      const y = (chapter.pos.top / 100) * mapContainerHeight * mapManager.scale;
+
+      // The nodes themselves are children of #map, which is scaled.
+      // The map's transform-origin is center center, so when it scales, it scales from its center.
+      // We need to account for the offset caused by the scaling of the #map element itself.
+      // The #map element is centered within mapContainer.
+      // Its unscaled size is mapContainerWidth x mapContainerHeight.
+      // Its scaled size is (mapContainerWidth * scale) x (mapContainerHeight * scale).
+      // The offset from the top-left of mapContainer to the top-left of the scaled map is:
+      const offsetX = (mapContainerWidth - mapContainerWidth * mapManager.scale) / 2;
+      const offsetY = (mapContainerHeight - mapContainerHeight * mapManager.scale) / 2;
+
+      return { x: x + offsetX, y: y + offsetY };
+    };
+
+
+    // Disegna tutte le possibili connessioni (oscurate)
+    Object.entries(chapters).forEach(([sourceId, sourceChapter]) => {
+      sourceChapter.choices.forEach(choice => {
+        const targetId = choice.node;
+        // Controlla se il nodo di destinazione esiste per prevenire errori
+        if (!chapters[targetId]) {
+            console.warn(`Nodo di destinazione ${targetId} non trovato per la scelta da ${sourceId}. Saltando il disegno della linea.`);
+            return;
+        }
+
+        // Ordina gli ID per creare una chiave unica per la connessione (es. "0-1" o "1-0")
+        const connectionKey = [sourceId, targetId].sort((a, b) => a - b).join('-'); // Converti a numeri per ordinamento corretto
+        if (drawnConnections.has(connectionKey)) {
+          return; // Salta se già disegnata
+        }
+        drawnConnections.add(connectionKey);
+
+        const startPos = getNodeCenter(sourceId);
+        const endPos = getNodeCenter(targetId);
+
+        if (startPos && endPos) {
+          ctx.beginPath();
+          ctx.moveTo(startPos.x, startPos.y);
+          ctx.lineTo(endPos.x, endPos.y);
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)'; // Linea oscurata per default
+          ctx.lineWidth = 1; // Line width is now fixed, as coordinates are already scaled
+          ctx.stroke();
+        }
+      });
+    });
+
+    // Reset del set per disegnare le linee visitate sopra quelle oscurate
+    drawnConnections.clear();
+
+    // Disegna le connessioni visitate (evidenziate)
+    for (let i = 0; i < gameState.history.length - 1; i++) {
+      const sourceId = gameState.history[i];
+      const targetId = gameState.history[i + 1];
+      const sourceChapter = chapters[sourceId];
+      const targetChapter = chapters[targetId];
+
+      if (!sourceChapter || !targetChapter) continue;
+
+      const connectionKey = [sourceId, targetId].sort((a, b) => a - b).join('-');
+      if (drawnConnections.has(connectionKey)) {
+        continue; // Salta se già disegnata come visitata
+      }
+      drawnConnections.add(connectionKey);
+
+      const startPos = getNodeCenter(sourceId);
+      const endPos = getNodeCenter(targetId);
+
+      if (startPos && endPos) {
+        ctx.beginPath();
+        ctx.moveTo(startPos.x, startPos.y);
+        ctx.lineTo(endPos.x, endPos.y);
+        ctx.strokeStyle = '#4CAF50'; // Verde brillante per le linee visitate
+        ctx.lineWidth = 3; // Line width is now fixed, as coordinates are already scaled
+        ctx.stroke();
+      }
+    }
+  }
+
+  // --- Classi del Sistema ---
+
+  class GameState {
+    constructor() {
+      this.currentNode = 0;
+      this.history = [0];
+      this.diary = {};
+      this.inventory = []; // Mantenuto per la logica 'requires'
+      this.flags = {}; // Nuova proprietà per i flag di stato
+      this.version = "1.0"; // Versione del formato di salvataggio
+    }
+
+    /**
+     * Salva lo stato del gioco in localStorage o sessionStorage.
+     * @returns {boolean} True se il salvataggio ha avuto successo, false altrimenti.
+     */
+    save() {
+      try {
+        const data = JSON.stringify({
+          state: {
+            currentNode: this.currentNode,
+            history: this.history,
+            inventory: this.inventory,
+            flags: this.flags,
+            version: this.version
+          },
+          diary: this.diary
+        });
+
+        if (!this.storageAvailable('localStorage')) {
+          console.warn("LocalStorage non disponibile, tentando sessionStorage.");
+          return this.saveToSessionStorage(data);
+        }
+
+        localStorage.setItem('gameState', data);
+        return true;
+      } catch (e) {
+        console.error("Errore durante il salvataggio:", e);
+        showCustomAlert('Errore nel salvataggio dei progressi.', 'error');
+        return false;
+      }
+    }
+
+    /**
+     * Carica lo stato del gioco da localStorage o sessionStorage.
+     * @returns {boolean} True se il caricamento ha avuto successo, false altrimenti.
+     */
+    load() {
+      try {
+        let data;
+        if (this.storageAvailable('localStorage')) {
+          data = localStorage.getItem('gameState');
+        } else {
+          data = sessionStorage.getItem('gameState');
+        }
+
+        if (!data) return false;
+
+        const parsed = JSON.parse(data);
+        if (parsed.state && parsed.state.version !== this.version) {
+          console.warn("Versione del salvataggio non corrispondente, tentando la migrazione.");
+          return this.migrateSave(parsed);
+        }
+
+        // Applica lo stato caricato all'istanza corrente
+        if (parsed.state) {
+          Object.assign(this, parsed.state);
+        }
+        this.diary = parsed.diary || {}; // Assicurati che il diario sia sempre un oggetto
+
+        return true;
+      } catch (e) {
+        console.error("Errore durante il caricamento:", e);
+        showCustomAlert('Errore nel caricamento dei dati salvati. Riavvio dell\'applicazione.', 'error');
+        return false;
+      }
+    }
+
+    /**
+     * Controlla se un tipo di storage è disponibile.
+     * @param {string} type - 'localStorage' o 'sessionStorage'.
+     * @returns {boolean} True se disponibile, false altrimenti.
+     */
+    storageAvailable(type) {
+      try {
+        const storage = window[type];
+        const x = '__storage_test__';
+        storage.setItem(x, x);
+        storage.removeItem(x);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /**
+     * Salva lo stato in sessionStorage (fallback).
+     * @param {string} data - Dati serializzati da salvare.
+     * @returns {boolean} True se il salvataggio ha avuto successo, false altrimenti.
+     */
+    saveToSessionStorage(data) {
+      try {
+        sessionStorage.setItem('gameState', data);
+        return true;
+      } catch (e) {
+        console.error("Errore durante il salvataggio in sessionStorage:", e);
+        showCustomAlert('Errore nel salvataggio dei progressi in sessione.', 'error');
+        return false;
+      }
+    }
+
+    /**
+     * Gestisce la migrazione di un salvataggio da una versione precedente.
+     * Per ora, resetta semplicemente il gioco. In un'applicazione reale, qui ci sarebbe la logica di conversione.
+     * @param {object} oldParsedData - Dati del salvataggio precedente.
+     * @returns {boolean} False (indica che il caricamento non è riuscito e il gioco è stato resettato).
+     */
+    migrateSave(oldParsedData) {
+      console.warn("Tentativo di migrazione del salvataggio fallito o non implementato. Reset dello stato.");
+      // Qui andrebbe la logica di migrazione. Per ora, resettiamo.
+      this.currentNode = 0;
+      this.history = [0];
+      this.diary = {};
+      this.inventory = [];
+      this.flags = {};
+      this.save(); // Salva il nuovo stato resettato
+      showCustomAlert('Il formato dei dati salvati è obsoleto. Il gioco è stato riavviato.', 'info');
+      return false; // Indica che il caricamento non è riuscito con i vecchi dati
+    }
+  }
+
+  class EventSystem {
+    constructor() {
+      this.events = {};
+      this.debug = DEBUG_MODE; // Usa il flag globale DEBUG_MODE
+    }
+
+    /**
+     * Registra un handler per un evento delegato.
+     * @param {string} event - Il nome dell'evento (es. 'click', 'keydown').
+     * @param {string} selector - Il selettore CSS per l'elemento target.
+     * @param {function} handler - La funzione da eseguire quando l'evento si verifica sul selettore.
+     * @param {object} options - Opzioni per addEventListener (es. { passive: true }).
+     */
+    on(event, selector, handler, options = {}) {
+      if (!this.events[event]) {
+        this.events[event] = [];
+        // Aggiunge un listener generico al document per l'evento specificato
+        document.addEventListener(event, this.handleEvent.bind(this), options);
+      }
+      this.events[event].push({ selector, handler });
+    }
+
+    /**
+     * Gestisce l'evento delegato, trovando il handler corretto.
+     * @param {Event} e - L'oggetto evento.
+     */
+    handleEvent(e) {
+      const handlers = this.events[e.type];
+      if (!handlers) return;
+
+      handlers.forEach(({ selector, handler }) => {
+        // Verifica se l'elemento che ha scatenato l'evento è un elemento e corrisponde al selettore
+        if (e.target && typeof e.target.matches === 'function' && e.target.matches(selector)) {
+          if (this.debug) console.log(`Evento: ${e.type} su ${selector}`);
+          handler(e);
+        }
+      });
+    }
+
+    /**
+     * Triggera un evento personalizzato.
+     * @param {string} eventName - Il nome dell'evento personalizzato.
+     * @param {object} detail - Dati da passare con l'evento.
+     */
+    trigger(eventName, detail = {}) {
+      if (this.debug) console.log(`Triggering custom event: ${eventName}`, detail);
+      const customEvent = new CustomEvent(eventName, { detail });
+      document.dispatchEvent(customEvent);
+    }
+  }
+
+  class MapManager {
+    constructor(mapElement, canvasElement) {
+      this.map = mapElement;
+      this.canvas = canvasElement;
+      this.scale = 0.7; // Scala iniziale per mostrare tutti i nodi
+      this.minScale = 0.5;
+      this.maxScale = 2.0;
+      this.zoomStep = 0.1; // Incremento/decremento dello zoom
+      this.init();
+    }
+
+    init() {
+      // Listener per lo zoom con la rotellina
+      mapContainer.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
+      // Listener per il pinch-to-zoom su touch (semplificato)
+      mapContainer.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
+      mapContainer.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+      mapContainer.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false });
+
+      // Listener per il ridimensionamento della finestra per ridisegnare le linee
+      window.addEventListener('resize', this.resizeCanvasAndRedraw.bind(this));
+
+      this.resizeCanvasAndRedraw(); // Imposta le dimensioni iniziali e disegna le linee
+      this.applyScale(); // Applica la scala iniziale (per i nodi)
+    }
+
+    /**
+     * Gestisce l'evento wheel per lo zoom.
+     * @param {WheelEvent} e - L'evento wheel.
+     */
+    handleWheel(e) {
+      e.preventDefault(); // Impedisce lo scroll della pagina
+
+      const direction = e.deltaY > 0 ? -1 : 1; // -1 per zoom out, 1 per zoom in
+      this.adjustScale(direction);
+    }
+
+    /**
+     * Gestisce l'inizio di un tocco per il pinch-to-zoom.
+     * @param {TouchEvent} e - L'evento touchstart.
+     */
+    handleTouchStart(e) {
+      if (e.touches.length === 2) {
+        this.initialPinchDistance = this.getDistance(e.touches[0], e.touches[1]);
+        this.initialScale = this.scale;
+      }
+    }
+
+    /**
+     * Gestisce il movimento del tocco per il pinch-to-zoom.
+     * @param {TouchEvent} e - L'evento touchmove.
+     */
+    handleTouchMove(e) {
+      if (e.touches.length === 2 && this.initialPinchDistance) {
+        e.preventDefault(); // Impedisce lo scroll della pagina
+        const currentPinchDistance = this.getDistance(e.touches[0], e.touches[1]);
+        const scaleFactor = currentPinchDistance / this.initialPinchDistance;
+        this.scale = this.initialScale * scaleFactor;
+        this.clampAndApplyScale();
+      }
+    }
+
+    /**
+     * Gestisce la fine di un tocco per il pinch-to-zoom.
+     * @param {TouchEvent} e - L'evento touchend.
+     */
+    handleTouchEnd(e) {
+      this.initialPinchDistance = null;
+      this.initialScale = null;
+    }
+
+    /**
+     * Calcola la distanza tra due punti touch.
+     * @param {Touch} touch1 - Il primo oggetto Touch.
+     * @param {Touch} touch2 - Il secondo oggetto Touch.
+     * @returns {number} La distanza tra i due tocchi.
+     */
+    getDistance(touch1, touch2) {
+      const dx = touch1.clientX - touch2.clientX;
+      const dy = touch1.clientY - touch2.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    /**
+     * Regola la scala della mappa.
+     * @param {number} direction - 1 per aumentare, -1 per diminuire.
+     */
+    adjustScale(direction) {
+      this.scale += direction * this.zoomStep;
+      this.clampAndApplyScale();
+    }
+
+    /**
+     * Limita la scala e la applica all'elemento mappa.
+     */
+    clampAndApplyScale() {
+      this.scale = Math.max(this.minScale, Math.min(this.maxScale, this.scale));
+      this.applyScale();
+    }
+
+    /**
+     * Applica la trasformazione di scala all'elemento mappa (i nodi).
+     */
+    applyScale() {
+      this.map.style.transform = `scale(${this.scale})`;
+      drawMapPaths(); // Ridisegna le linee ogni volta che la scala cambia
+    }
+
+    /**
+     * Resetta lo zoom al valore iniziale.
+     */
+    resetZoom() {
+      this.scale = 0.7; // Scala iniziale
+      this.applyScale();
+    }
+
+    /**
+     * Ridimensiona il canvas e ridisegna le linee.
+     * Il canvas viene dimensionato sulle dimensioni NON scalate del suo contenitore.
+     */
+    resizeCanvasAndRedraw() {
+      if (this.canvas && mapContainer) {
+        this.canvas.width = mapContainer.clientWidth;
+        this.canvas.height = mapContainer.clientHeight;
+        drawMapPaths(); // Ridisegna le linee dopo il ridimensionamento
+      }
+    }
+  }
+
+  class EffectSystem {
+    constructor(gameStateInstance) {
+      this.state = gameStateInstance;
+    }
+
+    /**
+     * Applica una lista di effetti allo stato del gioco.
+     * @param {Array<object>} effects - Array di oggetti effetto.
+     */
+    applyEffects(effects) {
+      if (!effects || !Array.isArray(effects)) return;
+
+      effects.forEach(effect => {
+        switch(effect.type) {
+          case 'addItem':
+            this.addToInventory(effect.item);
+            break;
+          case 'removeItem':
+            // this.removeFromInventory(effect.item); // Rimosso l'effetto di rimozione dall'inventario
+            break;
+          case 'setFlag':
+            this.setFlag(effect.flag, effect.value);
+            break;
+          case 'triggerEvent':
+            eventSystem.trigger(effect.eventName, effect.data); // Triggera un evento personalizzato
+            break;
+          default:
+            console.warn(`Tipo di effetto sconosciuto: ${effect.type}`);
+        }
+      });
+      this.state.save(); // Salva lo stato dopo aver applicato gli effetti
+    }
+
+    /**
+     * Aggiunge un oggetto all'inventario se non già presente.
+     * Mantenuto per la logica 'requires', anche se non c'è UI.
+     * @param {string} item - Il nome dell'oggetto.
+     */
+    addToInventory(item) {
+      if (!this.state.inventory.includes(item)) {
+        this.state.inventory.push(item);
+        showCustomAlert(`${item} ottenuto!`, 'success'); // Messaggio di conferma per l'ottenimento
+      }
+    }
+
+    /**
+     * Imposta un flag di stato.
+     * @param {string} flag - Il nome del flag.
+     * @param {boolean} value - Il valore del flag (default true).
+     */
+    setFlag(flag, value = true) {
+      this.state.flags[flag] = value;
+    }
+  }
+
+  class DebugTools {
+    /**
+     * Valida la struttura dati dei capitoli per errori comuni.
+     */
+    static validateGameData() {
+      console.log("Esecuzione della validazione dei dati di gioco...");
+      Object.entries(chapters).forEach(([id, chapter]) => {
+        if (!chapter.title) console.error(`[VALIDAZIONE] Capitolo ${id} manca il titolo.`);
+        if (!chapter.text) console.error(`[VALIDAZIONE] Capitolo ${id} manca il testo.`);
+        if (!chapter.description) console.error(`[VALIDAZIONE] Capitolo ${id} manca la descrizione.`);
+        if (!chapter.pos || typeof chapter.pos.top === 'undefined' || typeof chapter.pos.left === 'undefined') {
+          console.error(`[VALIDAZIONE] Capitolo ${id} manca le coordinate di posizione (pos).`);
+        }
+
+        chapter.choices?.forEach((choice, index) => {
+          if (!choice.label) console.error(`[VALIDAZIONE] Scelta ${index} nel capitolo ${id} manca l'etichetta.`);
+          if (typeof choice.node === 'undefined' || !chapters[choice.node]) {
+            console.error(`[VALIDAZIONE] Scelta ${index} nel capitolo ${id} punta a un nodo inesistente: ${choice.node}`);
+          }
+        });
+      });
+      console.log("Validazione dati di gioco completata.");
+    }
+
+    /**
+     * Mostra uno snapshot dello stato corrente del gioco.
+     * @returns {object} Lo stato corrente del gioco.
+     */
+    static stateSnapshot() {
+      return {
+        currentNode: gameState.currentNode,
+        history: [...gameState.history],
+        inventory: [...gameState.inventory],
+        flags: {...gameState.flags},
+        diary: {...gameState.diary}
+      };
+    }
+
+    /**
+     * Inietta oggetti di test nell'inventario per scopi di debug.
+     * (Solo per testare la logica 'requires', la UI è stata rimossa)
+     */
+    static injectTestItems() {
+      if (DEBUG_MODE) {
+        console.log("Iniezione di oggetti di test nell'inventario (solo per logica 'requires').");
+        if (!gameState.inventory.includes('Chiave Antica')) {
+            gameState.inventory.push('Chiave Antica');
+        }
+        if (!gameState.inventory.includes('Binocolo')) {
+            gameState.inventory.push('Binocolo');
+        }
+        gameState.save(); // Salva lo stato con i nuovi oggetti
+      }
+    }
+  }
+
+  class PluginSystem {
+    constructor() {
+      this.plugins = [];
+    }
+
+    /**
+     * Registra un plugin nel sistema.
+     * @param {object} plugin - L'oggetto plugin con un metodo `init`.
+     */
+    register(plugin) {
+      if (plugin.init && typeof plugin.init === 'function') {
+        plugin.init(this);
+        this.plugins.push(plugin);
+        if (DEBUG_MODE) console.log(`Plugin registrato: ${plugin.name || 'Anonimo'}`);
+      } else {
+        console.warn("Tentativo di registrare un plugin senza un metodo 'init' valido.", plugin);
+      }
+    }
+
+    /**
+     * Triggera un evento su tutti i plugin registrati.
+     * @param {string} event - Il nome dell'evento da triggerare (es. 'onChapterLoad').
+     * @param {object} data - I dati da passare all'evento.
+     */
+    trigger(event, data) {
+      this.plugins.forEach(plugin => {
+        if (plugin[event] && typeof plugin[event] === 'function') {
+          try {
+            plugin[event](data);
+          } catch (e) {
+            console.error(`Errore nel plugin ${plugin.name || 'Anonimo'} durante l'evento ${event}:`, e);
+          }
+        }
+      });
+    }
+  }
+
+  // Esempio di un plugin per l'analisi (potrebbe inviare dati a un servizio esterno)
+  const analyticsPlugin = {
+    name: 'AnalyticsPlugin',
+    init: (system) => {
+      console.log("Analytics Plugin inizializzato.");
+      // Qui si potrebbe inizializzare un servizio di analytics
+    },
+    onChapterLoad: (chapterData) => {
+      console.log(`Analytics: Capitolo caricato - ${chapterData.title} (ID: ${chapterData.id})`);
+      // Inviare dati a un servizio di analytics esterno
+    },
+    onItemAdded: (item) => {
+      console.log(`Analytics: Oggetto aggiunto - ${item}`);
+    }
+  };
+
+
+  // --- Inizializzazione Globale ---
+
+  // Riferimento al mapContainer per i listener di zoom
+  const mapContainer = document.getElementById('map-container');
+
+  // Inizializzazione dell'applicazione al caricamento del DOM
+  document.addEventListener('DOMContentLoaded', () => {
+    // Inizializza i sistemi principali
+    gameState = new GameState();
+    eventSystem = new EventSystem();
+    mapManager = new MapManager(mapElement, mapCanvas); // Passa anche il canvas
+    effectSystem = new EffectSystem(gameState);
+    plugins = new PluginSystem(); // Inizializza il sistema di plugin
+
+    // Registra i plugin
+    plugins.register(analyticsPlugin);
+
+    // Caricamento iniziale dello stato del gioco
+    if (!gameState.load()) {
+      gameState.save(); // Se non c'è un salvataggio, crea un salvataggio iniziale
+    }
+
+    // Esegui strumenti di debug se la modalità debug è attiva
+    if (DEBUG_MODE) {
+      DebugTools.validateGameData();
+      DebugTools.injectTestItems(); // Inietta oggetti di test se in modalità debug
+      console.log("Stato iniziale del gioco (DEBUG):", DebugTools.stateSnapshot());
+    }
+
+    // Carica il capitolo corrente (o il capitolo 0 se non c'è stato salvato)
+    loadChapter(gameState.currentNode, false);
+
+    // Setup delle funzionalità di accessibilità e ottimizzazione delle prestazioni
+    setupAccessibility();
+    optimizePerformance();
+
+    // Triggera un evento per il caricamento iniziale del capitolo
+    plugins.trigger('onChapterLoad', { id: gameState.currentNode, title: chapters[gameState.currentNode].title });
+
+    // --- Gestione della musica con SoundCloud ---
+    const soundcloudScript = document.createElement('script');
+    soundcloudScript.src = 'https://w.soundcloud.com/player/api.js';
+    soundcloudScript.async = true;
+    document.body.appendChild(soundcloudScript);
+
+    let soundcloudWidget; // Variabile per l'istanza del widget SoundCloud
+
+    soundcloudScript.onload = () => {
+      console.log("SoundCloud API script loaded.");
+      const iframe = document.getElementById('soundcloud-player');
+
+      if (iframe && typeof SC !== 'undefined' && typeof SC.Widget === 'function') {
+        soundcloudWidget = SC.Widget(iframe);
+        console.log("SoundCloud widget initialized.");
+
+        // Funzione per aggiornare il testo del pulsante
+        const updateMusicButtonText = () => {
+          if (soundcloudWidget) {
+            soundcloudWidget.isPaused((paused) => {
+              if (paused) {
+                musicToggleButton.textContent = 'Avvia Musica';
+                console.log("Music is paused. Button text set to 'Avvia Musica'.");
+              } else {
+                musicToggleButton.textContent = 'Ferma Musica';
+                console.log("Music is playing. Button text set to 'Ferma Musica'.");
+              }
+            });
+          }
+        };
+
+        // Aggiorna lo stato del pulsante all'inizializzazione e quando la riproduzione cambia
+        soundcloudWidget.bind(SC.Widget.Events.PLAY, () => {
+          console.log("SoundCloud: PLAY event triggered.");
+          updateMusicButtonText();
+        });
+        soundcloudWidget.bind(SC.Widget.Events.PAUSE, () => {
+          console.log("SoundCloud: PAUSE event triggered.");
+          updateMusicButtonText();
+        });
+        soundcloudWidget.bind(SC.Widget.Events.READY, () => {
+          console.log("SoundCloud: READY event triggered.");
+          updateMusicButtonText(); // Aggiorna lo stato iniziale del pulsante
+        });
+
+        // Listener per il pulsante di toggle della musica
+        musicToggleButton.addEventListener('click', () => {
+          if (soundcloudWidget) {
+            soundcloudWidget.isPaused((paused) => {
+              if (paused) {
+                soundcloudWidget.play();
+                console.log("Attempting to play music.");
+              } else {
+                soundcloudWidget.pause();
+                console.log("Attempting to pause music.");
+              }
+            });
+          } else {
+            console.warn("SoundCloud widget not ready for toggle.");
+          }
+        });
+
+      } else {
+        console.error("SoundCloud iframe o API non disponibili dopo il caricamento dello script. I controlli musicali potrebbero non funzionare.");
+        musicToggleButton.style.display = 'none'; // Nascondi il pulsante se il player non può essere inizializzato
+      }
+    };
+    soundcloudScript.onerror = () => {
+      console.error("Failed to load SoundCloud API script.");
+      musicToggleButton.style.display = 'none';
+    };
+    // --- Fine gestione musica SoundCloud ---
+
+    // Event listener per il salvataggio del diario
+    saveDiaryBtn.addEventListener('click', handleSaveDiary);
+    // Event listener per i pulsanti di scelta (delegato)
+    choicesDiv.addEventListener('click', handleChoiceClick);
+
+    // Event listener per il pulsante Reset Zoom
+    resetZoomBtn.addEventListener('click', () => {
+      mapManager.resetZoom();
+    });
+  });
+</script>
+</body>
+</html>
