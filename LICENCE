@@ -1,0 +1,53 @@
+Il Sentiero delle Nuvole - Un Gioco Narrativo Interattivo
+Questo repository contiene il codice sorgente per "Il Sentiero delle Nuvole", un'esperienza di gioco narrativo interattivo basata su HTML, CSS e JavaScript. Il gioco permette ai giocatori di esplorare una storia ramificata, prendere decisioni che influenzano il percorso e visualizzare i progressi su una mappa dinamica.
+
+Caratteristiche
+Narrazione Interattiva: Scegli il tuo percorso attraverso capitoli ramificati.
+
+Mappa Dinamica: Visualizza i nodi visitati e i percorsi sbloccati sulla mappa.
+
+Cronologia delle Scelte: Tieni traccia del tuo viaggio attraverso una timeline.
+
+Diario Personale: Salva note e riflessioni in un diario integrato.
+
+Gestione Inventario e Flag: Le decisioni e gli oggetti raccolti influenzano le scelte future.
+
+Musica di Sottofondo: Un'esperienza sonora immersiva (tramite SoundCloud).
+
+Responsivo: Adattabile a diverse dimensioni di schermo.
+
+Come Usare/Eseguire il Progetto
+Per eseguire "Il Sentiero delle Nuvole" localmente, segui questi semplici passaggi:
+
+Clona il Repository:
+Apri il tuo terminale o prompt dei comandi e clona questo repository:
+
+git clone https://github.com/tuo-utente/tuo-repository.git
+# Sostituisci "tuo-utente/tuo-repository" con il percorso effettivo del tuo repository
+
+Naviga nella Cartella del Progetto:
+
+cd tuo-repository
+# O il nome della cartella in cui hai clonato il progetto
+
+Apri il File HTML:
+Apri il file index.html (o il nome del tuo file principale HTML) direttamente nel tuo browser web preferito. Non è necessario un server web per la maggior parte delle funzionalità, ma per un'esperienza ottimale (specialmente con le API esterne come SoundCloud in un ambiente di sviluppo), potresti voler usare un server locale semplice (ad esempio, con Live Server per VS Code o python -m http.server).
+
+Licenza
+Questo progetto è rilasciato sotto la licenza GNU General Public License v3.0 (GPLv3).
+
+    GNU General Public License v3.0
+    Copyright (C) 2025 Ernesto Lamberti
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
